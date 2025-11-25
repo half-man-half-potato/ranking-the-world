@@ -1,0 +1,32 @@
+﻿id,Indicator,Indicator_full,source,url,UoM,year
+1,GDP,GDP (current US$),World Bank,https://data.worldbank.org/indicator/NY.GDP.MKTP.CD,"US$, billions",2024
+2,GDP per capita,GDP per capita (current US$),World Bank,https://data.worldbank.org/indicator/NY.GDP.PCAP.CD,"US$, thousands",2024
+3,"GDP, PPP","GDP, PPP (current international $)",World Bank,https://data.worldbank.org/indicator/NY.GDP.MKTP.PP.CD,"""international $"", billions",2024
+4,"GDP per capita, PPP","GDP per capita, PPP (current international $)",World Bank,https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD,"""international $"", thousands",2024
+5,Budget,General government final consumption expenditure (current US$),World Bank,https://data.worldbank.org/indicator/NE.CON.GOVT.CD,"US$, billions",2023
+6,Budget (% of GDP),General government final consumption expenditure (% of GDP),World Bank,https://data.worldbank.org/indicator/NE.CON.GOVT.ZS,%,2023
+7,Inflation,"Inflation, consumer prices (annual %)",World Bank,https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG,%,2024
+8,Unemployment,"Unemployment, total (% of total labor force) (modeled ILO estimate)",World Bank,https://data.worldbank.org/indicator/SL.UEM.TOTL.ZS,%,2024
+9,Debt (% of GDP),Debt (% of GDP),IMF,https://www.imf.org/external/datamapper/DEBT1@DEBT/FAD_G20Adv/FAD_G20Emg/FAD_LIC/CAN,%,2015
+10,"Foreign direct investment, net","Foreign direct investment, net inflows (BoP, current US$)",World Bank,https://data.worldbank.org/indicator/BX.KLT.DINV.CD.WD,"US$, billions",2024
+,Population,"Population, total",World Bank,https://data.worldbank.org/indicator/SP.POP.TOTL,million,2024
+,Female population share,"Population, female (% of total population)",World Bank,https://data.worldbank.org/indicator/SP.POP.TOTL.FE.ZS,%,2024
+,Population ages 65+ share,Population ages 65 and above (% of total population),World Bank,https://data.worldbank.org/indicator/SP.POP.65UP.TO.ZS,%,2024
+,Density,Population density (people per sq. km of land area),World Bank,https://data.worldbank.org/indicator/EN.POP.DNST,people per sq. km,2022
+,Life expectancy,"Life expectancy at birth, total (years)",World Bank,https://data.worldbank.org/indicator/SP.DYN.LE00.IN,years,2023
+,Urban population share,Urban population (% of total population),World Bank,https://data.worldbank.org/indicator/SP.URB.TOTL.IN.ZS,%,2024
+,Adult literacy rate,"Literacy rate, adult total (% of people ages 15 and above)",World Bank,https://data.worldbank.org/indicator/SE.ADT.LITR.ZS, ,
+,Land area,Land area (sq. km),World Bank,https://data.worldbank.org/indicator/AG.LND.TOTL.K2,"sq.km, thousands",2023
+,Surface area,Surface area (sq. km),World Bank,https://data.worldbank.org/indicator/AG.SRF.TOTL.K2,"sq.km, thousands",2023
+,Agricultural land share,Agricultural land (% of land area),World Bank,https://data.worldbank.org/indicator/AG.LND.AGRI.ZS,%,2023
+,Arable land share,Arable land (% of land area),World Bank,https://data.worldbank.org/indicator/AG.LND.ARBL.ZS,%,2023
+,Forest area share,Forest area (% of land area),World Bank,https://data.worldbank.org/indicator/AG.LND.FRST.ZS,%,2023
+,Publications,Scientific and technical journal articles,World Bank,https://data.worldbank.org/indicator/IP.JRN.ARTC.SC,thousands,2022
+,"Patents, residents","Patent applications, residents",World Bank,https://data.worldbank.org/indicator/IP.PAT.RESD,thousands,2021
+,"Patents, nonresidents","Patent applications, nonresidents",World Bank,https://data.worldbank.org/indicator/IP.PAT.NRES,thousands,2021
+,High-technology exports,High-technology exports (current US$),World Bank,https://data.worldbank.org/indicator/TX.VAL.TECH.CD,"US$, billions",2023
+,R&D (% of GDP),Research and development expenditure (% of GDP),World Bank,https://data.worldbank.org/indicator/GB.XPD.RSDV.GD.ZS,%,2021
+,Museums,Number of museums per country,UNESCO,https://pgav.org.au/file/14545/6389, ,2021
+,Net migration,Net migration,World Bank,https://data.worldbank.org/indicator/SM.POP.NETM,thousands,2024
+,International migrants,"International migrant stock, total",World Bank,https://data.worldbank.org/indicator/SM.POP.TOTL,millions,2024
+,International migrants share,International migrant stock (% of population),World Bank,,%,2024
