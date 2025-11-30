@@ -10,17 +10,30 @@ from dash.exceptions import PreventUpdate
 #########################################################################################################################################################
 
 
-# data is joined from 2 denormalized tables
-df_data = pd.read_csv('data/data.csv')
+# 2 denormalized source tables
+df = pd.read_csv('data/data.csv')
 df_metadata = pd.read_csv('data/metadata.csv')
-df = df_data.merge(df_metadata, how='left', on='Indicator')
+ds_countries = pd.read_csv('data/countries.csv')["Country"]
 
-df = df.sort_values(by=["Indicator", "Value", "Country"], ascending=[True, False, True]).reset_index(drop=True) # move to the data file?
-df["rank"] = df.groupby("Indicator").cumcount() + 1 # todo: understand
-df["country_with_rank"] = (df["rank"].astype(int).astype(str) + ". " + df["Country"])
+###################################################
+# at top (after reading df)
+# convert strings to categorical (saves memory + speeds groupby/sort)
+df["Indicator"] = df["Indicator"].astype("category")
+df["Country"] = df["Country"].astype("category")
 
-# list of countries
-ds_countries = df["Country"].drop_duplicates().sort_values(ascending=True)
+# Build per-indicator DataFrames and store as copies (sorted by Rank ascending)
+"""
+{
+    "GDP":           <DataFrame of GDP rows sorted by Rank>,
+    "Inflation":     <...>,
+    ...
+}
+"""
+indicator_dfs = {
+    ind: df_ind.sort_values("Rank").reset_index(drop=True)
+    for ind, df_ind in df.groupby("Indicator", observed=False)
+}
+###################################################
 
 # framework for building rows / grids of charts
 indicator_groups = {
@@ -30,49 +43,14 @@ indicator_groups = {
     "Science": ["Publications", "Patents, residents", "Patents, nonresidents", "High-technology exports", "R&D (% of GDP)"]
 }
 
-#
-
 # default settings
 mode = "top10"
 selected_country = None
-
-# generate safe IDs from indicator names
-def make_key(s):
-    return (
-        s.lower()
-         .replace(" ", "_")
-         .replace(",", "")
-         .replace("/", "_")
-         .replace("(", "")
-         .replace(")", "")
-         .replace("%", "pct")
-    )
 
 # will be used in the future to customize some charts, for now it is just a placeholder
 chart_configs = {
     "Patents": {"type": "stacked", "secondary": "Budget (% of GDP)"},
 }
-
-key_to_indicator = {} # reverse lookup for indicator id -> name
-indicator_max_value = {} # axis upper boundary
-indicator_min_value = {} # axis lower boundary
-indicator_to_group = {} # reverse lookup dictionary
-for group, indicators in indicator_groups.items():
-    for ind in indicators:
-        key_to_indicator[make_key(ind)] = ind
-
-        vals = df.loc[df["Indicator"] == ind, "Value"].dropna()
-        indicator_max_value[ind] = float(vals.max())
-        indicator_min_value[ind] = min(float(vals.min()), 0)
-
-        indicator_to_group[ind] = group
-
-"""
-dcc.Store is a Dash component that lets you store data in the browser so that callbacks can read/write it.
-It’s basically Dash’s built-in client-side memory.
-Can access the mapping in callbacks via State("key-to-indicator","data").
-"""
-# dcc.Store(id="key-to-indicator", data=key_to_indicator) # note: not used
 
 
 #########################################################################################################################################################
@@ -82,17 +60,17 @@ Can access the mapping in callbacks via State("key-to-indicator","data").
 
 # returns data for charts based on parameters selected by the User (or the default parameters)
 def return_chart_data(indicator_name, mode, selected_country):
-    df_filtered = df[df["Indicator"] == indicator_name].sort_values(by="rank").copy()
+    df_filtered = indicator_dfs[indicator_name].copy()
 
     if mode == "top10" or (mode == "country" and selected_country is None): # show top 10 countries (default) unless the User actually selects a country from the dropdown
         return df_filtered.nlargest(10, "Value").sort_values(by='Value', ascending=True)
     else: # when User actually selects a country from the dropdown (not just switches the radio button to show the dropdown)
 
         if selected_country not in df_filtered["Country"].values: # if the selected country has no data for the given indicator, ...
-            return pd.DataFrame(columns=["Country", "Value", "rank"]) # ... show an empty box
+            return pd.DataFrame(columns=["Country", "Value", "Rank", "Country_with_rank"]) # ... show an empty box
 
-        selected_country_rank = df_filtered.loc[df_filtered["Country"] == selected_country, "rank"].iloc[0]
-        countries_count = df_filtered["rank"].max()
+        selected_country_rank = df_filtered.loc[df_filtered["Country"] == selected_country, "Rank"].iloc[0]
+        countries_count = df_filtered["Rank"].max()
 
         # below is how I want to choose the "neighbors" for the selected country for different scenarios
         if selected_country_rank <= 10:
@@ -100,17 +78,22 @@ def return_chart_data(indicator_name, mode, selected_country):
         elif selected_country_rank >= countries_count - 10:
             return df_filtered.nsmallest(10, "Value").sort_values(by='Value', ascending=True)
         else:
-            df_neighbors = df_filtered[(df_filtered["rank"] >= selected_country_rank - 5) & (df_filtered["rank"] <= selected_country_rank + 4)]
-            df_neighbors = df_neighbors.sort_values(by="rank", ascending=True)
+            df_neighbors = df_filtered[(df_filtered["Rank"] >= selected_country_rank - 5) & (df_filtered["Rank"] <= selected_country_rank + 4)]
+            df_neighbors = df_neighbors.sort_values(by="Rank", ascending=True)
             return df_neighbors
 
 # generate a bar chart
 def create_bar_chart(indicator_name, mode, selected_country):
-    df_chart = return_chart_data(indicator_name, mode, selected_country).sort_values(by='rank', ascending=False)
+    df_chart = return_chart_data(indicator_name, mode, selected_country).sort_values(by='Rank', ascending=False)
+
+    if len(df_chart) == 0:
+        bg_color="whitesmoke"
+    else:
+        bg_color="white"
 
     # x-axis range
-    x_max = indicator_max_value[indicator_name]
-    x_min = indicator_min_value[indicator_name]
+    x_max = df_metadata.loc[df_metadata["Indicator"] == indicator_name, "Max_value"].iloc[0]
+    x_min = df_metadata.loc[df_metadata["Indicator"] == indicator_name, "Min_value"].iloc[0]
 
     # dynamic decimals
     max_val = df_chart["Value"].max()
@@ -121,11 +104,12 @@ def create_bar_chart(indicator_name, mode, selected_country):
 
     cond = df_chart["Value"] / x_max > 0.75 # todo: improve later
 
-    if indicator_to_group[indicator_name] == "Economy":
+    group = df_metadata.loc[df_metadata["Indicator"] == indicator_name, "Group"].iloc[0]
+    if group == "Economy":
         df_chart["bar_color"] = np.where(df_chart["Country"] == selected_country, "goldenrod", "khaki")
-    elif indicator_to_group[indicator_name] == "People":
+    elif group == "People":
         df_chart["bar_color"] = np.where(df_chart["Country"] == selected_country, "gray", "silver")
-    elif indicator_to_group[indicator_name] == "Geography":
+    elif group == "Geography":
         df_chart["bar_color"] = np.where(df_chart["Country"] == selected_country, "seagreen", "lightgreen")
     else:
         df_chart["bar_color"] = np.where(df_chart["Country"] == selected_country, "steelblue", "lightblue")
@@ -158,14 +142,14 @@ def create_bar_chart(indicator_name, mode, selected_country):
     )
 
     fig.update_layout(
-        plot_bgcolor="white",
+        plot_bgcolor=bg_color,
         xaxis_title=None,
         yaxis_title=None,
         margin=dict(l=0, r=0, t=0, b=0),
         yaxis=dict(showticklabels=False, automargin=False, fixedrange=True),
         xaxis=None,
         width=90,
-        height=160
+        height=160,
     )
 
     fig.update_xaxes(
@@ -223,17 +207,17 @@ def create_chart(indicator_name, mode, selected_country):
 # a single-column table that replaces the bar chart y-axis labels (so that I can customize their appearance, particularly align them to left)
 def create_countries_list(indicator_name, mode, selected_country):
 
-    df_chart = return_chart_data(indicator_name, mode, selected_country).sort_values(by='rank', ascending=True)
+    df_chart = return_chart_data(indicator_name, mode, selected_country).sort_values(by='Rank', ascending=True)
 
     return dash_table.DataTable(
-        id={"type": "countries-table", "indicator": make_key(indicator_name)},
+        id={"type": "countries-table", "indicator": indicator_name},
 
         # Use the real column name directly
-        data=df_chart[["country_with_rank"]].to_dict("records"),
+        data=df_chart[["Country_with_rank"]].to_dict("records"),
 
         # Column id MUST match the key in each row dict
         # Column name must exist, but can be empty
-        columns=[{"id": "country_with_rank", "name": ""}],
+        columns=[{"id": "Country_with_rank", "name": ""}],
 
         style_table={"width": "90px"},
         style_cell={"textAlign": "left", "fontSize": "10px"},
@@ -255,7 +239,7 @@ def generate_row(indicator_names, mode, selected_country):
             html.Div(  # 1 box (a flex)
                 children=[
                     html.Div( # UoM (unit of measure)
-                        df[df["Indicator"] == indicator_name]["UoM"].drop_duplicates(),
+                        df_metadata[df_metadata["Indicator"] == indicator_name]["UoM"].drop_duplicates(),
                         style={
                             "position": "absolute",
                             "top": "16px",
@@ -268,11 +252,11 @@ def generate_row(indicator_names, mode, selected_country):
                         }
                     ),
                     html.Div([ # source | year | countries count
-                        html.Div(df[df["Indicator"] == indicator_name]["source"].drop_duplicates(), style={"color": "darkgray", "marginRight": "3px"}),
+                        html.Div(df_metadata[df_metadata["Indicator"] == indicator_name]["Source"].drop_duplicates(), style={"color": "darkgray", "marginRight": "3px"}),
                         html.Div("|", style={"color": "gray", "marginRight": "3px"}),
-                        html.Div(df[df["Indicator"] == indicator_name]["year"].drop_duplicates(), style={"color": "darkgray", "marginRight": "3px"}),
+                        html.Div(df_metadata[df_metadata["Indicator"] == indicator_name]["Year"].drop_duplicates(), style={"color": "darkgray", "marginRight": "3px"}),
                         html.Div("|", style={"color": "gray", "marginRight": "3px"}),
-                        html.Div(f"{len(df[df["Indicator"] == indicator_name]["Country"])}", style={"color": "darkgray", "marginRight": "2px"}),
+                        html.Div(f"{len(indicator_dfs[indicator_name]["Country"])}", style={"color": "darkgray", "marginRight": "2px"}), #todo: move to csv
                         html.Div("countries", style={"color": "darkgray"}),
                         ], style={
                             "display": "flex",
@@ -283,16 +267,26 @@ def generate_row(indicator_names, mode, selected_country):
                             "top": "194px",
                         }
                     ),
+
+
+
+
+
                     html.Div(  # box title
                         indicator_name,
                         style={"marginBottom": "0px", "marginTop": "2px", "fontSize": "11px", "fontWeight": "bold"}
                     ),
+
+
+
+
+
                     html.Div(  # 1 box (a flex)
                         children=[
                             create_countries_list(indicator_name, mode, selected_country),
                             html.Div(  # box body with chart
                                 dcc.Graph(
-                                    id={"type": "chart", "indicator": make_key(indicator_name)},
+                                    id={"type": "chart", "indicator": indicator_name},
                                     figure=create_chart(indicator_name, mode, selected_country),
                                     config={"displayModeBar": False},
                                     style={"height": "160px", "width": "90px", "marginBottom": "15px",
@@ -489,7 +483,7 @@ def toggle_dropdown(mode):
     State({"type": "countries-table", "indicator": ALL}, "id")
 )
 def update_all(mode, country, chart_ids, table_ids):
-
+    # chart_figures, table_data_list, table_styles_list
     current_mode = "country" if (mode == "country" and country) else "top10"
 
     chart_figures = []
@@ -498,31 +492,25 @@ def update_all(mode, country, chart_ids, table_ids):
 
     # --- UPDATE CHARTS ----------------------------------------------------
     for comp_id in chart_ids:
-        indicator_key = comp_id["indicator"]
-        indicator_name = key_to_indicator[indicator_key]
+        indicator_name = comp_id["indicator"]
 
         fig = create_chart(indicator_name, current_mode, country)
         chart_figures.append(fig)
 
     # --- UPDATE TABLES ----------------------------------------------------
     for comp_id in table_ids:
-        indicator_key = comp_id["indicator"]
-        indicator_name = key_to_indicator[indicator_key]
+        indicator_name = comp_id["indicator"]
 
         df_chart = return_chart_data(indicator_name, current_mode, country)
-        df_chart = df_chart.sort_values(by="rank", ascending=True)
+        df_chart = df_chart.sort_values(by="Rank", ascending=True)
 
-        df_chart["country_with_rank"] = (
-            df_chart["rank"].astype(int).astype(str) + ". " + df_chart["Country"]
-        )
-
-        table_data = df_chart[["country_with_rank"]].to_dict("records")
+        table_data = df_chart[["Country_with_rank"]].to_dict("records")
         table_data_list.append(table_data)
 
         if country:
             style = [
                 {
-                    "if": {"filter_query": '{{country_with_rank}} contains "{}"'.format(country)},
+                    "if": {"filter_query": '{{Country_with_rank}} contains "{}"'.format(country)},
                     "fontWeight": "bold",
                     "color": "black"
                 }
@@ -535,5 +523,5 @@ def update_all(mode, country, chart_ids, table_ids):
     return chart_figures, table_data_list, table_styles_list
 
 
-# if __name__ == "__main__":
-#     app.run(debug=True)
+if __name__ == "__main__":
+    app.run(debug=True)
